@@ -1,10 +1,90 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 
 public class Z80CPU {
+
+    public double CPUSpeed
+    {
+        get { return _cpuSpeed; }
+        set {
+            _cpuSpeed = value;
+            _cycleTime = 1.0 / _cpuSpeed;
+        }
+    }
+
+    public double CycleTime
+    {
+        get { return _cycleTime; }
+        set {
+            _cycleTime = value;
+            _cpuSpeed = 1.0 / _cycleTime;
+        }
+    }
+
+    // Run the processor upt a maximum of the simulated time indicated in seconds.
+    // It doesn't actually take that long (I hope!), but rather uses the clock
+    // speed against a cycle counter and runs however many operations it would
+    // normally get done until the indicated time slice has completed.
+    //
+    // This function may return early for any number of reasons, including the
+    // the HALT and STOP commands getting called. However barring such scenarios
+    // it guarantees at least one run through the emulator (even if seconds == 0).
+    //
+    // NOTE: It's likely that this naive implementation may not be compatible
+    // with proper inputs. We'll have to see... :\
+    public void RunForTimeChunk(float seconds)
+    {
+        _cycles = 0;
+
+        do
+        { // at least once
+            if (HALT || STOP)
+                break;  // unless we are HALTed or STOPped.
+
+            Process();
+        } while (_cycles * _cycleTime < seconds);
+    }
+
+    public bool Halted
+    {
+        get { return HALT; }
+    }
+
+    public bool Stopped
+    {
+        get { return STOP; }
+    }
+
+    public void SetMemory(ushort address, byte value)
+    {
+        if (address >= ram.Length)
+            throw new System.Exception("Tried to set ram past the end: @" + address + "; max: " + (ram.Length - 1));
+
+        ram[address] = value;
+    }
+
+    public void SetMemory(ushort start, byte[] chunk)
+    {
+        if (start >= ram.Length)
+            throw new System.Exception("Tried to set ram past the end: @" + start + "; max: " + (ram.Length - 1));
+        
+        if (start + chunk.Length > ram.Length)
+            throw new System.Exception("Set ram would overflow the end: @" + (start + chunk.Length) + "; max: " + (ram.Length - 1));
+
+        chunk.CopyTo(ram, start);
+    }
+
+    //=========================================================================
+    // Private variables required for the CPU to function
+    private double _cpuSpeed = 4194304.0 * 1000000;
+    private double _cycleTime = 1.0 / (4194304.0 * 1000000);
+
     private byte[] ram = new byte[65536];
-    private ushort SP = 0xfffe; // stack pointer
-    private ushort PC = 0x0000; // program counter (the next instruction to execute)
+    private ushort SP = 0xfffe;  // stack pointer
+    private ushort PC = 0x0000;  // program counter (the next instruction to execute)
+
+    private ulong _cycles = 0;  // count of how many logic cycles have been processed since last count reset
 
 	// These are often accessed in pairs to address memory.
 	// I can't decide if it's better to use them as combined
@@ -24,7 +104,7 @@ public class Z80CPU {
     private byte HALF_CARRY_FLAG = 1 << 5;
     private byte CARRY_FLAG = 1 << 4;
 
-    private bool IME = true; // Interrupt Master Enabled flag
+    private bool IME = true;  // Interrupt Master Enabled flag
     private byte VBLANK_IF = 1;
     private byte LCDC_IF = 1 << 1;
     private byte TIMER_OVERFLOW_IF = 1 << 2;
@@ -37,7 +117,46 @@ public class Z80CPU {
     private const ushort IF_Addr = 0xFF0F;
     private const ushort IE_Addr = 0xFFFF;
 
-    // SERIAL goes to 0xFF01 ?
+    public const ushort SB_addr = 0xFF01;  // serial out
+    public const ushort SC_addr = 0xFF02;  // serial control
+
+    private bool _runSerialAccumulator = false;
+    private List<char> _serialOut = new List<char>();
+    private void AccumulateSerial() {
+        while(_runSerialAccumulator) {
+            if ((ram[SC_addr] & 0x80) == 0x80) {
+                _serialOut.Add((char)ram[SB_addr]);
+                ram[SC_addr] &= 0x0f;  // reset the conrol bit
+            }
+            Thread.Sleep(0);
+        }
+    }
+
+    public string GetSerialString()
+    {
+        return new string(_serialOut.ToArray());
+    }
+
+    private Thread _serialThread;
+    public void StartSerialThread() {
+        _serialOut.Clear();
+        if (_serialThread == null || !_serialThread.IsAlive)
+        {
+            _serialThread = new Thread(new ThreadStart(AccumulateSerial));
+            _serialThread.Start();
+        }
+    }
+
+    public Z80CPU()
+    {
+
+    }
+
+    ~Z80CPU()
+    {
+        _runSerialAccumulator = false;
+        _serialThread.Join();
+    }
 
     private enum OpCodes : byte
     {
@@ -286,7 +405,8 @@ public class Z80CPU {
         DI = 0xFB
     }
 
-    enum MultyByteOpcode {
+    enum MultyByteOpcode
+    {
         RLC_m = 0x00,
         RL_m = 0x02,
         RRC_m = 0x01,
@@ -305,7 +425,8 @@ public class Z80CPU {
         public byte counterShift;
     }
 
-    private Dictionary<OpCodes, OpMetaData> OpInfo = new Dictionary<OpCodes, OpMetaData>() {
+    private Dictionary<OpCodes, OpMetaData> OpInfo = new Dictionary<OpCodes, OpMetaData>()
+    {
         { OpCodes.LD_A_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
         { OpCodes.LD_A_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
         { OpCodes.LD_A_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
@@ -511,6 +632,7 @@ public class Z80CPU {
         { OpCodes.RLA, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
         { OpCodes.RRCA, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
         { OpCodes.RRA, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
+        { OpCodes.MULTI_BYTE_OP, new OpMetaData() { cycleCount = 0, counterShift = 0 } }, // These are handled elsewhere
         { OpCodes.JP_NN, new OpMetaData() { cycleCount = 4, counterShift = 0 } },
         { OpCodes.JP_NZ_NN, new OpMetaData() { cycleCount = 4/3, counterShift = 3 } },
         { OpCodes.JP_Z_NN, new OpMetaData() { cycleCount = 4/3, counterShift = 3 } },
@@ -1159,7 +1281,8 @@ public class Z80CPU {
 
     //=========================================================================
     // Process the next instruction on the CPU
-    void Process() {
+    private void Process()
+    {
         byte instruction = ram[PC++];
         OpCodes opcode = (OpCodes)instruction;
         OpMetaData meta = OpInfo[opcode];
@@ -1859,9 +1982,10 @@ public class Z80CPU {
 			case OpCodes.RRA:
                 A = Do_RR(A);
 				break;
-            case (OpCodes)0xCB:	// this code accounts for many variants based on the second byte read
+            case OpCodes.MULTI_BYTE_OP:	// this code accounts for many variants based on the second byte read
                 {
                     OpMetaData data = DecodeAndExecute_0xCB();
+                    _cycles += data.cycleCount;
                 }
                 break;
             case OpCodes.JP_NN:
@@ -1987,5 +2111,7 @@ public class Z80CPU {
                 IME = false;
                 break;
         }
-    }
-}
+        _cycles += meta.cycleCount;
+    } // end Process() method
+
+} // end Z80CPU class
