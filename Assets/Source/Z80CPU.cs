@@ -46,7 +46,7 @@ public class Z80CPU {
 
             ++steps;
             Process(seconds == 0);
-        } while (_cycles * _cycleTime < seconds && steps < 100000);
+        } while (_cycles * _cycleTime * 4 < seconds && steps < 100000);
 
         if (steps == 100000) {
             System.Console.WriteLine("Hit 100,000 steps @ " + _cycles + " cycles");
@@ -648,27 +648,27 @@ public class Z80CPU {
         { OpCodes.RRA, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
         { OpCodes.MULTI_BYTE_OP, new OpMetaData() { cycleCount = 0, counterShift = 0 } }, // These are handled elsewhere
         { OpCodes.JP_NN, new OpMetaData() { cycleCount = 4, counterShift = 0 } },
-        { OpCodes.JP_NZ_NN, new OpMetaData() { cycleCount = 4/3, counterShift = 3 } },
-        { OpCodes.JP_Z_NN, new OpMetaData() { cycleCount = 4/3, counterShift = 3 } },
-        { OpCodes.JP_NC_NN, new OpMetaData() { cycleCount = 4/3, counterShift = 3 } },
-        { OpCodes.JP_C_NN, new OpMetaData() { cycleCount = 4/3, counterShift = 3 } },
+        { OpCodes.JP_NZ_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
+        { OpCodes.JP_Z_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
+        { OpCodes.JP_NC_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
+        { OpCodes.JP_C_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
         { OpCodes.JR_e, new OpMetaData() { cycleCount = 3, counterShift = 2 } },
-        { OpCodes.JR_NZ_e, new OpMetaData() { cycleCount = 3/2, counterShift = 2 } },
-        { OpCodes.JR_Z_e, new OpMetaData() { cycleCount = 3/2, counterShift = 2 } },
-        { OpCodes.JR_NC_e, new OpMetaData() { cycleCount = 3/2, counterShift = 2 } },
-        { OpCodes.JR_C_e, new OpMetaData() { cycleCount = 3/2, counterShift = 2 } },
+        { OpCodes.JR_NZ_e, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
+        { OpCodes.JR_Z_e, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
+        { OpCodes.JR_NC_e, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
+        { OpCodes.JR_C_e, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
         { OpCodes.JP_mHL, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
         { OpCodes.CALL_NN, new OpMetaData() { cycleCount = 6, counterShift = 3 } },
-        { OpCodes.CALL_NZ_NN, new OpMetaData() { cycleCount = 6/3, counterShift = 3 } },
-        { OpCodes.CALL_Z_NN, new OpMetaData() { cycleCount = 6/3, counterShift = 3 } },
-        { OpCodes.CALL_NC_NN, new OpMetaData() { cycleCount = 6/3, counterShift = 3 } },
-        { OpCodes.CALL_C_NN, new OpMetaData() { cycleCount = 6/3, counterShift = 3 } },
+        { OpCodes.CALL_NZ_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
+        { OpCodes.CALL_Z_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
+        { OpCodes.CALL_NC_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
+        { OpCodes.CALL_C_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
         { OpCodes.RET, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
         { OpCodes.RETI, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.RET_NZ, new OpMetaData() { cycleCount = 5/2, counterShift = 1 } },
-        { OpCodes.RET_Z, new OpMetaData() { cycleCount = 5/2, counterShift = 1 } },
-        { OpCodes.RET_NC, new OpMetaData() { cycleCount = 5/2, counterShift = 1 } },
-        { OpCodes.RET_C, new OpMetaData() { cycleCount = 5/2, counterShift = 1 } },
+        { OpCodes.RET_NZ, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
+        { OpCodes.RET_Z, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
+        { OpCodes.RET_NC, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
+        { OpCodes.RET_C, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
         { OpCodes.RST_0, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
         { OpCodes.RST_1, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
         { OpCodes.RST_2, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
@@ -928,7 +928,6 @@ public class Z80CPU {
             PC = dest;
             ++_cycles;
         }
-        ++_cycles;
     }
 
     void Do_JumpRelativeConditional(bool test) {
@@ -941,7 +940,6 @@ public class Z80CPU {
             PC = dest;
             ++_cycles;
         }
-        ++_cycles;
     }
 
     //=========================================================================
@@ -987,6 +985,7 @@ public class Z80CPU {
             PushAddressHelper(high, low);
 
             PC = (ushort)((high << 8) | low);
+            _cycles += 3;
         }
     }
 
@@ -995,6 +994,7 @@ public class Z80CPU {
         if(test)
         {
             PC = PopAddressHelper();
+            _cycles += 3;
         }
     }
 
