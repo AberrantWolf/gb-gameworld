@@ -752,25 +752,35 @@ public class Z80CPU {
 
     //=========================================================================
     // Rotation helpers
+
+    // Rotate left through self; but copy the old leftmost bit to carry anyway
     byte Do_RLC(byte value) {
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0b1000_0000) == 0b1000_0000);
+        // 0x80 is binary 1000 0000, checking the leftmost bit for carry
+        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x80) == 0x80);
         return (byte)((value << 1) | (value >> 7));
     }
 
+    // Rotate left THROUGH the CARRY_FLAG bit, such that C moves to bit 0 and bit 7 moves to C
     byte Do_RL(byte value) {
         int carryBit = (F & CARRY_FLAG) == CARRY_FLAG ? 1 : 0;
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0b1000_0000) == 0b1000_0000);
+        // 0x80 is binary 1000 0000, checking the leftmost bit for carry
+        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x80) == 0x80);
         return (byte)((value << 1) | carryBit);
     }
 
+    // Rotate right through self; but put bit 1 into carry
     byte Do_RRC(byte value) {
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0b0000_0001) == 0b0000_0001);
+        // Set carry flag if 
+        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x01) == 0x01);
         return (byte)((value >> 1) | (value << 7));
     }
 
+    // rotate right THROUGH carry
     byte Do_RR(byte value) {
-        int carryBit = (F & CARRY_FLAG) == CARRY_FLAG ? 0b1000 : 0;
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0b0000_0001) == 0b0000_0001);
+        // 0x80 is binary 1000 0000 (bit 7), so set bit 7 if carry is set
+        int carryBit = (F & CARRY_FLAG) == CARRY_FLAG ? 0x80 : 0;
+        // move bit 1 into the carry flag
+        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x01) == 0x01);
         return (byte)((value >> 1) | carryBit);
     }
 
@@ -853,8 +863,11 @@ public class Z80CPU {
 
     //=========================================================================
     // Shift helpers
+
+    // Shift value to the left one bit
     byte Do_SLA(byte value) {
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0b1000_0000) == 0b1000_0000);
+        // Set carry to the leftmost bit (7), which is binary 1000 0000, or 0x80
+        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x80) == 0x80);
         byte result = (byte)(value << 1);
         SetFlagConditional(ZERO_FLAG, result == 0);
         ResetFlag(SUBT_FLAG);
@@ -862,18 +875,21 @@ public class Z80CPU {
         return result;
     }
 
+    // Shift value to the right one bit, putting 0 into bit 7
     byte Do_SRA(byte value) {
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0b0000_0001) == 0b0000_0001);
-        byte result = (byte)((value >> 1) & 0b0111_1111);
+        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x01) == 0x01);
+        // 0x7f is binary 0111_1111 -- a mask to force the leftmost bit to 0
+        byte result = (byte)((value >> 1) & 0x7f);
         SetFlagConditional(ZERO_FLAG, result == 0);
         ResetFlag(SUBT_FLAG);
         ResetFlag(HALF_CARRY_FLAG);
         return result;
     }
 
+    // Shift value to the right one bit, preserving bit 7
     byte Do_SRL(byte value) {
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0b0000_0001) == 0b0000_0001);
-        int msb_flag = value & 0b1000_0000;
+        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x01) == 0x01);
+        int msb_flag = value & 0x80;
         byte result = (byte)((value >> 1) | msb_flag);
         SetFlagConditional(ZERO_FLAG, result == 0);
         ResetFlag(SUBT_FLAG);
@@ -898,34 +914,34 @@ public class Z80CPU {
     //=========================================================================
     // Helper methods for then the opcode demands a second byte for the operation
     enum SecondOpType : byte {
-        ROTATE_SHIFT = 0b00_000_000,
-        BIT_CHECK = 0b01_000_000,
-        RESET = 0b10_000_000,
-        SET = 0b11_000_000
+        ROTATE_SHIFT = 0x00, //00_000_000
+        BIT_CHECK = 0x40, //01_000_000
+        RESET = 0x80, //10_000_000,
+        SET = 0xc0, //11_000_000
     }
 
     enum SecondOpRegisterPattern
     {
-        A = 0b00_000_111,
-        B = 0b00_000_000,
-        C = 0b00_000_001,
-        D = 0b00_000_010,
-        E = 0b00_000_011,
-        H = 0b00_000_100,
-        L = 0b00_000_101,
-        mHL = 0b00_000_110
+        A = 0x07, //00_000_111
+        B = 0x00, //00_000_000
+        C = 0x01, //00_000_001
+        D = 0x02, //00_000_010
+        E = 0x03, //00_000_011
+        H = 0x04, //00_000_100
+        L = 0x05, //00_000_101
+        mHL = 0x06, //00_000_110
     };
 
     enum SecondOpCode : byte
     {
-        RLC = 0b000,
-        RL = 0b010,
-        RRC = 0b001,
-        RR = 0b011,
-        SLA = 0b100,
-        SRA = 0b101,
-        SRL = 0b111,
-        SWAP = 0b110,
+        RLC = 0x0, //000,
+        RL = 0x2, //010,
+        RRC = 0x1, //001,
+        RR = 0x3, //011,
+        SLA = 0x4, //100,
+        SRA = 0x5, //101,
+        SRL = 0x7, //111,
+        SWAP = 0x6, //110,
     };
 
     byte HandleRotateShiftOp(byte value, SecondOpCode opcode)
@@ -962,11 +978,11 @@ public class Z80CPU {
         byte secondOp = ram[PC++];
 
         // The register pattern is stored in lowest three bits of the opcode
-        int regIdx = (secondOp & 0b00_000_111);
+        int regIdx = (secondOp & 0x7); //0x7 is 00 000 111
 
         // Most bit operations operate on a single bit; and we can obtain
         // a mask by bytes 3-5 as a number of which bit to use.
-        int midBits = (secondOp & 0b00_111_000) >> 3;
+        int midBits = (secondOp & 0x38) >> 3; // 0x38 is 00 111 000
         int bitMask = 1 << midBits;
 
         // This would be much more elegant if I could use pointers to assign
@@ -975,7 +991,7 @@ public class Z80CPU {
         //
         // TODO: I could use structs or classes for each register to pass a
         // reference into the functions instead of this awful set of switches.
-        SecondOpType type = (SecondOpType)(secondOp & 0b11_000_000);
+        SecondOpType type = (SecondOpType)(secondOp & 0xc0); //0xc0 is 11 000 000
         switch(type) {
             case SecondOpType.BIT_CHECK:
                 // Set the ZERO_FLAG if the specified bit in the register is zero
