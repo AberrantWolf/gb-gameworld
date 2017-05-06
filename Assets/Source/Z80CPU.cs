@@ -305,19 +305,6 @@ public class Z80CPU {
         public byte counterShift;
     }
 
-    private Dictionary<MultyByteOpcode, OpMetaData> MBOpInfo = new Dictionary<MultyByteOpcode, OpMetaData>() {
-        { MultyByteOpcode.RLC_m, new OpMetaData() { cycleCount = 2/4, counterShift = 2 } },
-        { MultyByteOpcode.RL_m, new OpMetaData() { cycleCount = 2/4, counterShift = 2 } },
-        { MultyByteOpcode.RRC_m, new OpMetaData() { cycleCount = 2/4, counterShift = 2 } },
-        { MultyByteOpcode.RR_m, new OpMetaData() { cycleCount = 2/4, counterShift = 2 } },
-        { MultyByteOpcode.SLA_m, new OpMetaData() { cycleCount = 2/4, counterShift = 2 } },
-        { MultyByteOpcode.SRA_m, new OpMetaData() { cycleCount = 2/4, counterShift = 2 } },
-        { MultyByteOpcode.SRL_m, new OpMetaData() { cycleCount = 2/4, counterShift = 2 } },
-        { MultyByteOpcode.SWAP_m, new OpMetaData() { cycleCount = 2/4, counterShift = 2 } },
-        { MultyByteOpcode.SET_b_r, new OpMetaData() { cycleCount = 2/4, counterShift = 2 } },
-        { MultyByteOpcode.RES_b_r, new OpMetaData() { cycleCount = 2/4, counterShift = 2 } }
-    };
-
     private Dictionary<OpCodes, OpMetaData> OpInfo = new Dictionary<OpCodes, OpMetaData>() {
         { OpCodes.LD_A_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
         { OpCodes.LD_A_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
