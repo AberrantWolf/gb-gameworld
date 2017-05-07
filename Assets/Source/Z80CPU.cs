@@ -128,48 +128,24 @@ public class Z80CPU {
     public const ushort SC_addr = 0xFF02;  // serial control
 
     private bool _runSerialAccumulator = false;
-    private List<char> _serialOut = new List<char>();
-    private void AccumulateSerial() {
-        while(_runSerialAccumulator) {
-            if ((_ram[SC_addr] & 0x80) == 0x80) {
-                _serialOut.Add((char)_ram[SB_addr]);
-                _ram[SC_addr] &= 0x0f;  // reset the conrol bit
-            }
-            Thread.Sleep(0);
-        }
+    private List<byte> _serialOut = new List<byte>();
+
+    public string GetSerialOut() {
+        return System.Text.Encoding.ASCII.GetString(_serialOut.ToArray());
     }
 
-    public string GetSerialString()
-    {
-        return new string(_serialOut.ToArray());
-    }
-
-    private Thread _serialThread;
-    public void StartSerialThread() {
+    public void ClearSerialOut() {
         _serialOut.Clear();
-        if (_serialThread == null || !_serialThread.IsAlive)
-        {
-            _serialThread = new Thread(new ThreadStart(AccumulateSerial));
-            _serialThread.Start();
-        }
-    }
-
-    public Z80CPU()
-    {
-
-    }
-
-    ~Z80CPU()
-    {
-        _runSerialAccumulator = false;
-        _serialThread.Join();
     }
 
     void WriteRam(ushort addr, byte val) {
-        if (addr == SB_addr) {
-            //Console.WriteLine("Wrote to serial! :: " + System.Text.Encoding.ASCII.GetString(new byte[]{val}));
-        }
         _ram[addr] = val;
+
+        if (addr == SC_addr && val == 0x81) {
+            //Console.WriteLine("Wrote to serial! :: " + System.Text.Encoding.ASCII.GetString(new byte[]{val}));
+            _serialOut.Add(_ram[SB_addr]);
+            _ram[SC_addr] &= 0x0f;
+        }
     }
 
     private enum OpCodes : byte

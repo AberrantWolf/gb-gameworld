@@ -31,7 +31,6 @@ public class Z80ControllerBehaviour : MonoBehaviour {
             return;
         }
         cpu.SetMemory(0, rom);
-        cpu.StartSerialThread();
     }
 
     float _serialPrintCounter = 0;
@@ -44,7 +43,8 @@ public class Z80ControllerBehaviour : MonoBehaviour {
 
         _serialPrintCounter += Time.deltaTime;
 		if (_serialPrintCounter > 2) {
-            Debug.Log(cpu.GetSerialString());
+            //Debug.Log(cpu.GetSerialString());
+            Debug.Log(cpu.GetSerialOut());
             _serialPrintCounter = 0;
         }
     }
