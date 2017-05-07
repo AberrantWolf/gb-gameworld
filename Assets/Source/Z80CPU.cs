@@ -65,21 +65,21 @@ public class Z80CPU {
 
     public void SetMemory(ushort address, byte value)
     {
-        if (address >= ram.Length)
-            throw new System.Exception("Tried to set ram past the end: @" + address + "; max: " + (ram.Length - 1));
+        if (address >= _ram.Length)
+            throw new System.Exception("Tried to set ram past the end: @" + address + "; max: " + (_ram.Length - 1));
 
-        ram[address] = value;
+        _ram[address] = value;
     }
 
     public void SetMemory(ushort start, byte[] chunk)
     {
-        if (start >= ram.Length)
-            throw new System.Exception("Tried to set ram past the end: @" + start + "; max: " + (ram.Length - 1));
+        if (start >= _ram.Length)
+            throw new System.Exception("Tried to set ram past the end: @" + start + "; max: " + (_ram.Length - 1));
         
-        if (start + chunk.Length > ram.Length)
-            throw new System.Exception("Set ram would overflow the end: @" + (start + chunk.Length) + "; max: " + (ram.Length - 1));
+        if (start + chunk.Length > _ram.Length)
+            throw new System.Exception("Set ram would overflow the end: @" + (start + chunk.Length) + "; max: " + (_ram.Length - 1));
 
-        chunk.CopyTo(ram, start);
+        chunk.CopyTo(_ram, start);
     }
 
     //=========================================================================
@@ -87,7 +87,7 @@ public class Z80CPU {
     private double _cpuSpeed = 4194304.0;
     private double _cycleTime = 1.0 / (4194304.0);
 
-    private byte[] ram = new byte[65536];
+	private byte[] _ram = new byte[65536];
     private ushort SP = 0xfffe;  // stack pointer
     private ushort PC = 0x0100;  // program counter (the next instruction to execute)
 
@@ -131,9 +131,9 @@ public class Z80CPU {
     private List<char> _serialOut = new List<char>();
     private void AccumulateSerial() {
         while(_runSerialAccumulator) {
-            if ((ram[SC_addr] & 0x80) == 0x80) {
-                _serialOut.Add((char)ram[SB_addr]);
-                ram[SC_addr] &= 0x0f;  // reset the conrol bit
+            if ((_ram[SC_addr] & 0x80) == 0x80) {
+                _serialOut.Add((char)_ram[SB_addr]);
+                _ram[SC_addr] &= 0x0f;  // reset the conrol bit
             }
             Thread.Sleep(0);
         }
@@ -167,9 +167,9 @@ public class Z80CPU {
 
     void WriteRam(ushort addr, byte val) {
         if (addr == SB_addr) {
-            Console.WriteLine("Wrote to serial!");
+            //Console.WriteLine("Wrote to serial! :: " + System.Text.Encoding.ASCII.GetString(new byte[]{val}));
         }
-        ram[addr] = val;
+        _ram[addr] = val;
     }
 
     private enum OpCodes : byte
@@ -716,18 +716,17 @@ public class Z80CPU {
 
     void LoadAddressToRegisterPair(ref byte high, ref byte low)
     {
-        low = ram[PC++];
-        high = ram[PC++];
+        low = _ram[PC++];
+        high = _ram[PC++];
     }
 
     ushort GetNNAddress()
     {
-        return (ushort)(ram[PC++] | ram[PC++] << 8);
+        return (ushort)(_ram[PC++] | _ram[PC++] << 8);
     }
     
     //=========================================================================
-    // HL increment and decrement are optimized actions across a few opcodes
-    // so here are some helper methods to keep things DRY.
+    // Increment and decrement helpers to keep things DRY.
     void Increment(ref byte high, ref byte low)
     {
         if (low == 0xff)
@@ -919,8 +918,8 @@ public class Z80CPU {
     {
         // Always read and increment the PC first, even if
         // the conditional isn't met. ESPECIALLY if not.
-        uint low = ram[PC++];
-        uint high = ram[PC++];
+        uint low = _ram[PC++];
+        uint high = _ram[PC++];
         if (test)
         {
             ushort dest = (ushort)(high << 8 | low);
@@ -931,7 +930,7 @@ public class Z80CPU {
     }
 
     void Do_JumpRelativeConditional(bool test) {
-        sbyte relative = (sbyte)ram[PC++];
+        sbyte relative = (sbyte)_ram[PC++];
         
         if (test)
         {
@@ -962,8 +961,8 @@ public class Z80CPU {
     // Pop an address and return the value as a ushort, incrementing
     // the stack pointer (SP) appropriately.
     ushort PopAddressHelper() {
-        byte high = ram[SP++];
-        byte low = ram[SP++];
+        byte high = _ram[SP++];
+        byte low = _ram[SP++];
 
         return (ushort)((high << 8) | low);
     }
@@ -971,20 +970,23 @@ public class Z80CPU {
     // Pop an address and write the high and low bytes, incrementing
     // the stack pointer (SP) appropriately.
     void PopAddressHelper(out byte high, out byte low) {
-        high = ram[SP++];
-        low = ram[SP++];
+        high = _ram[SP++];
+        low = _ram[SP++];
     }
 
     void Do_CallConditional(bool test)
     {
-        byte low = ram[PC++];
-        byte high = ram[PC++];
+        byte dest_low = _ram[PC++];
+        byte dest_high = _ram[PC++];
+
+		byte current_low = (byte)(PC & 0x00ff);
+		byte current_high = (byte)((PC >> 8) & 0x00ff);
 
         if(test)
         {
-            PushAddressHelper(high, low);
+			PushAddressHelper(current_high, current_low);
 
-            PC = (ushort)((high << 8) | low);
+			PC = (ushort)((dest_high << 8) | dest_low);
             _cycles += 3;
         }
     }
@@ -1112,7 +1114,7 @@ public class Z80CPU {
         metaInfo.counterShift = 2;
         metaInfo.cycleCount = 2; // most of the ops use 2 cycles
 
-        byte secondOp = ram[PC++];
+        byte secondOp = _ram[PC++];
 
         // The register pattern is stored in lowest three bits of the opcode
         int regIdx = (secondOp & 0x7); //0x7 is 00 000 111
@@ -1155,7 +1157,7 @@ public class Z80CPU {
                         SetFlagConditional(ZERO_FLAG, (L & bitMask) == 0);
                         break;
                     case SecondOpRegisterPattern.mHL:
-                        SetFlagConditional(ZERO_FLAG, (ram[GetHLAddress()] & bitMask) == 0);
+                        SetFlagConditional(ZERO_FLAG, (_ram[GetHLAddress()] & bitMask) == 0);
                         metaInfo.cycleCount = 3;
                         break;
                 }
@@ -1186,8 +1188,9 @@ public class Z80CPU {
                     case SecondOpRegisterPattern.L:
                         L |= (byte)bitMask;
                         break;
-                    case SecondOpRegisterPattern.mHL:
-                        ram[GetHLAddress()] |= (byte)bitMask;
+					case SecondOpRegisterPattern.mHL:
+						byte value = (byte)(_ram [GetHLAddress ()] | bitMask);
+						WriteRam(GetHLAddress(), value);
                         metaInfo.cycleCount = 3;
                         break;
                 }
@@ -1217,8 +1220,9 @@ public class Z80CPU {
                     case SecondOpRegisterPattern.L:
                         L &= (byte)~bitMask;
                         break;
-                    case SecondOpRegisterPattern.mHL:
-                        ram[GetHLAddress()] &= (byte)~bitMask;
+					case SecondOpRegisterPattern.mHL:
+						byte value = (byte)(_ram[GetHLAddress()] & ~bitMask);
+						WriteRam(GetHLAddress(), value);
                         metaInfo.cycleCount = 3;
                         break;
                 }
@@ -1252,7 +1256,7 @@ public class Z80CPU {
                         L = HandleRotateShiftOp(A, code);
                         break;
                     case SecondOpRegisterPattern.mHL:
-                        WriteRam(GetHLAddress(), HandleRotateShiftOp(ram[GetHLAddress()], code));
+                        WriteRam(GetHLAddress(), HandleRotateShiftOp(_ram[GetHLAddress()], code));
                         metaInfo.cycleCount = 4;
                         break;
                 }
@@ -1312,33 +1316,50 @@ public class Z80CPU {
         public ushort addr;
     }
     private Queue<OperationInfo> _info_q = new Queue<OperationInfo>();
+	private void DumpLastOperations()
+	{
+		Console.WriteLine("CALL LOG:");
+		while(_info_q.Count > 0) {
+			OperationInfo info = _info_q.Dequeue();
+			Console.WriteLine("0x" + info.addr.ToString("X4") + "  $" + info.code.ToString("X") + " " + info.code.ToString());
+		}
+	}
+
+	private static ulong _debugCycleCount = 0;
+	private static bool _hitJump = false;
 
     //=========================================================================
     // Process the next instruction on the CPU
     private void Process(bool printOpcodes)
     {
-        if (PC == ram.Length - 1) {
+        if (PC == _ram.Length - 1) {
             Console.WriteLine("Z80CPU hit the end of memory...");
             STOP = true;
             return;
         }
 
+		++_debugCycleCount;
 
-        // if(PC == 0x0210) {
-        //     Console.WriteLine("HIT THE JUMP!!");
-        // }
+//		if (_hitJump && PC < 0x4000) {
+//			Console.WriteLine ("Went back @" + _debugCycleCount + " to 0x" + PC.ToString ("X4"));
+//			DumpLastOperations ();
+//			_hitJump = false;
+//		}
 
 
-        byte instruction = ram[PC++];
+		if(PC == 0xC0C2) {
+			Console.WriteLine("HIT THE LINE!! " + _debugCycleCount);
+			DumpLastOperations ();
+			_hitJump = true;
+		}
+
+
+        byte instruction = _ram[PC++];
         OpCodes opcode = (OpCodes)instruction;
 
         if (!OpInfo.ContainsKey(opcode))
         {
-            Console.WriteLine("ERROR LOG:");
-            while(_info_q.Count > 0) {
-                OperationInfo info = _info_q.Dequeue();
-                Console.WriteLine("0x" + info.addr.ToString("X4") + "  $" + info.code.ToString("X") + " " + info.code.ToString());
-            }
+			DumpLastOperations ();
             Console.WriteLine("Unrecognized opcode: " + opcode.ToString("X") + " at address " + (PC-1).ToString("X4") + "; cycles: " + _cycles);
             return;
         }
@@ -1350,14 +1371,16 @@ public class Z80CPU {
             }
 
             _info_q.Enqueue(new OperationInfo() { code = opcode, addr = (ushort)(PC - 1) });
-            while(_info_q.Count > 10)
+            while(_info_q.Count > 20)
             {
                 _info_q.Dequeue();
             }
         }
+
+
         OpMetaData meta = OpInfo[opcode];
 		
-		switch(opcode) {
+ 		switch(opcode) {
 			case OpCodes.LD_A_A:
                 // do nothing since it's copying to itself
                 break;
@@ -1506,46 +1529,46 @@ public class Z80CPU {
 				// pass
 				break;
 			case OpCodes.LD_A_N:
-                A = ram[PC++];
+                A = _ram[PC++];
                 break;
 			case OpCodes.LD_B_N:
-                B = ram[PC++];
+                B = _ram[PC++];
 				break;
 			case OpCodes.LD_C_N:
-                C = ram[PC++];
+                C = _ram[PC++];
 				break;
 			case OpCodes.LD_D_N:
-                D = ram[PC++];
+                D = _ram[PC++];
 				break;
 			case OpCodes.LD_E_N:
-                E = ram[PC++];
+                E = _ram[PC++];
 				break;
 			case OpCodes.LD_H_N:
-                H = ram[PC++];
+                H = _ram[PC++];
 				break;
 			case OpCodes.LD_L_N:
-                L = ram[PC++];
+                L = _ram[PC++];
 				break;
 			case OpCodes.LD_A_mHL:
-                A = ram[GetHLAddress()];
+                A = _ram[GetHLAddress()];
 				break;
 			case OpCodes.LD_B_mHL:
-                B = ram[GetHLAddress()];
+                B = _ram[GetHLAddress()];
 				break;
 			case OpCodes.LD_C_mHL:
-                C = ram[GetHLAddress()];
+                C = _ram[GetHLAddress()];
 				break;
 			case OpCodes.LD_D_mHL:
-                D = ram[GetHLAddress()];
+                D = _ram[GetHLAddress()];
 				break;
 			case OpCodes.LD_E_mHL:
-                E = ram[GetHLAddress()];
+                E = _ram[GetHLAddress()];
 				break;
 			case OpCodes.LD_H_mHL:
-                H = ram[GetHLAddress()];
+                H = _ram[GetHLAddress()];
 				break;
 			case OpCodes.LD_L_mHL:
-                L = ram[GetHLAddress()];
+                L = _ram[GetHLAddress()];
 				break;
 			case OpCodes.LD_mHL_A:
                 WriteRam(GetHLAddress(), A);
@@ -1569,38 +1592,38 @@ public class Z80CPU {
                 WriteRam(GetHLAddress(), A);
 				break;
 			case OpCodes.LD_mHL_N:
-                WriteRam(GetHLAddress(), ram[PC++]);
+                WriteRam(GetHLAddress(), _ram[PC++]);
 				break;
 			case OpCodes.LD_A_mBC:
-                A = ram[GetBCAddress()];
+                A = _ram[GetBCAddress()];
                 break;
 			case OpCodes.LD_A_mDE:
-                A = ram[GetDEAddress()];
+                A = _ram[GetDEAddress()];
 				break;
 			case OpCodes.LD_A_mC:
-                A = ram[GetFFCAddress()];
+                A = _ram[GetFFCAddress()];
 				break;
 			case OpCodes.LD_mC_A:
                 WriteRam(GetDEAddress(), A);
 				break;
 			case OpCodes.LD_A_mN:
-                A = ram[GetFFNAddress(ram[PC++])];
+                A = _ram[GetFFNAddress(_ram[PC++])];
 				break;
 			case OpCodes.LD_mN_A:
-                WriteRam(GetFFNAddress(ram[PC++]), A);
+                WriteRam(GetFFNAddress(_ram[PC++]), A);
 				break;
 			case OpCodes.LD_A_mNN:
-                A = ram[GetNNAddress()];
+                A = _ram[GetNNAddress()];
 				break;
 			case OpCodes.LD_mNN_A:
                 WriteRam(GetNNAddress(), A);
                 break;
 			case OpCodes.LD_A_HLI:
-                A = ram[GetHLAddress()];
+                A = _ram[GetHLAddress()];
                 Increment(ref H, ref L);
                 break;
 			case OpCodes.LD_A_HLD:
-                A = ram[GetHLAddress()];
+                A = _ram[GetHLAddress()];
                 Decrement(ref H, ref L);
                 break;
 			case OpCodes.LD_mBC_A:
@@ -1633,40 +1656,32 @@ public class Z80CPU {
                 SP = GetHLAddress();
                 break;
 			case OpCodes.PUSH_BC:
-                WriteRam(--SP, B);
-                WriteRam(--SP, C);
+                PushAddressHelper(B, C);
                 break;
 			case OpCodes.PUSH_DE:
-                WriteRam(--SP, D);
-                WriteRam(--SP, E);
+                PushAddressHelper(D, E);
 				break;
 			case OpCodes.PUSH_HL:
-                WriteRam(--SP, H);
-                WriteRam(--SP, L);
+                PushAddressHelper(H, L);
 				break;
 			case OpCodes.PUSH_AF:
-                WriteRam(--SP, A);
-                WriteRam(--SP, F);
+                PushAddressHelper(A, F);
 				break;
 			case OpCodes.POP_BC:
-                C = ram[SP++];
-                B = ram[SP++];
+                PopAddressHelper(out B, out C);
                 break;
 			case OpCodes.POP_DE:
-                E = ram[SP++];
-                D = ram[SP++];
+                PopAddressHelper(out D, out E);
 				break;
 			case OpCodes.POP_HL:
-                L = ram[SP++];
-                H = ram[SP++];
+                PopAddressHelper(out H, out L);
 				break;
 			case OpCodes.POP_AF:
-                F = ram[SP++];
-                A = ram[SP++];
+                PopAddressHelper(out A, out F);
 				break;
             case OpCodes.LDHL_SP_e:
                 {
-                    byte b = (byte)ram[SP + 1];
+                    byte b = (byte)_ram[PC++];
                     ushort temp = AddByteToUShort(SP, b);
                     H = (byte)((temp & 0xFF00) >> 8);
                     L = (byte)(temp & 0x00FF);
@@ -1676,7 +1691,7 @@ public class Z80CPU {
                 {
                     ushort addr = GetNNAddress();
                     WriteRam(addr++, (byte)(SP & 0x00ff));
-                    WriteRam(ram[addr], (byte)((SP & 0xff00) >> 8));
+                    WriteRam(_ram[addr], (byte)((SP & 0xff00) >> 8));
                 }
                 break;
             case OpCodes.ADD_A_A:
@@ -1701,10 +1716,10 @@ public class Z80CPU {
                 A = AddByteToAccum(L);
 				break;
 			case OpCodes.ADD_A_N:
-                A = AddByteToAccum(ram[PC++]);
+                A = AddByteToAccum(_ram[PC++]);
 				break;
 			case OpCodes.ADD_A_mHL:
-                A = AddByteToAccum(ram[GetHLAddress()]);
+                A = AddByteToAccum(_ram[GetHLAddress()]);
 				break;
 			case OpCodes.ADC_A_A:
                 A = AddByteAndCarryToAccum(A);
@@ -1728,10 +1743,10 @@ public class Z80CPU {
                 A = AddByteAndCarryToAccum(L);
 				break;
 			case OpCodes.ADC_A_N:
-                A = AddByteAndCarryToAccum(ram[PC++]);
+                A = AddByteAndCarryToAccum(_ram[PC++]);
 				break;
 			case OpCodes.ADC_A_mHL:
-                A = AddByteAndCarryToAccum(ram[GetHLAddress()]);
+                A = AddByteAndCarryToAccum(_ram[GetHLAddress()]);
 				break;
 			case OpCodes.SUB_A:
                 A = SubtractByteFromAccum(A);
@@ -1755,10 +1770,10 @@ public class Z80CPU {
                 A = SubtractByteFromAccum(L);
 				break;
 			case OpCodes.SUB_N:
-                A = SubtractByteFromAccum(ram[PC++]);
+                A = SubtractByteFromAccum(_ram[PC++]);
 				break;
 			case OpCodes.SUB_mHL:
-                A = SubtractByteFromAccum(ram[GetHLAddress()]);
+                A = SubtractByteFromAccum(_ram[GetHLAddress()]);
 				break;
 			case OpCodes.SBC_A_A:
                 A = SubtractByteAndCarryFromAccum(A);
@@ -1782,10 +1797,10 @@ public class Z80CPU {
                 A = SubtractByteAndCarryFromAccum(L);
 				break;
 			case OpCodes.SBC_A_N:
-                A = SubtractByteAndCarryFromAccum(ram[PC++]);
+                A = SubtractByteAndCarryFromAccum(_ram[PC++]);
 				break;
 			case OpCodes.SBC_A_mHL:
-                A = SubtractByteAndCarryFromAccum(ram[GetHLAddress()]);
+                A = SubtractByteAndCarryFromAccum(_ram[GetHLAddress()]);
 				break;
 			case OpCodes.AND_A:
                 A = (byte)(A & A);
@@ -1816,11 +1831,11 @@ public class Z80CPU {
                 SetFLogic(A, true);
 				break;
 			case OpCodes.AND_N:
-                A = (byte)(A & ram[PC++]);
+                A = (byte)(A & _ram[PC++]);
                 SetFLogic(A, true);
 				break;
 			case OpCodes.AND_mHL:
-                A = (byte)(A & ram[GetHLAddress()]);
+                A = (byte)(A & _ram[GetHLAddress()]);
                 SetFLogic(A, true);
 				break;
 			case OpCodes.OR_A:
@@ -1852,11 +1867,11 @@ public class Z80CPU {
                 SetFLogic(A, false);
 				break;
 			case OpCodes.OR_N:
-                A = (byte)(A | ram[PC++]);
+                A = (byte)(A | _ram[PC++]);
                 SetFLogic(A, false);
 				break;
 			case OpCodes.OR_mHL:
-                A = (byte)(A | ram[GetHLAddress()]);
+                A = (byte)(A | _ram[GetHLAddress()]);
                 SetFLogic(A, false);
 				break;
 			case OpCodes.XOR_A:
@@ -1888,11 +1903,11 @@ public class Z80CPU {
                 SetFLogic(A, false);
 				break;
 			case OpCodes.XOR_N:
-                A = (byte)(A ^ ram[PC++]);
+                A = (byte)(A ^ _ram[PC++]);
                 SetFLogic(A, false);
 				break;
 			case OpCodes.XOR_mHL:
-                A = (byte)(A ^ ram[GetHLAddress()]);
+                A = (byte)(A ^ _ram[GetHLAddress()]);
                 SetFLogic(A, false);
 				break;
 			case OpCodes.CP_A:
@@ -1917,10 +1932,10 @@ public class Z80CPU {
                 CompareWithAccum(L);
 				break;
 			case OpCodes.CP_N:
-                CompareWithAccum(ram[PC++]);
+                CompareWithAccum(_ram[PC++]);
 				break;
 			case OpCodes.CP_mHL:
-                CompareWithAccum(ram[GetHLAddress()]);
+                CompareWithAccum(_ram[GetHLAddress()]);
 				break;
 			case OpCodes.INC_A:
                 Increment(ref A);
@@ -1944,7 +1959,7 @@ public class Z80CPU {
                 Increment(ref L);
 				break;
 			case OpCodes.INC_mHL:
-                Increment(ref ram[GetHLAddress()]);
+                Increment(ref _ram[GetHLAddress()]);
 				break;
 			case OpCodes.DEC_A:
                 Decrement(ref A);
@@ -1968,7 +1983,7 @@ public class Z80CPU {
                 Decrement(ref L);
 				break;
 			case OpCodes.DEC_mHL:
-                Decrement(ref ram[GetHLAddress()]);
+                Decrement(ref _ram[GetHLAddress()]);
 				break;
 			case OpCodes.ADD_HL_BC:
                 L = AddByteToByte(L, C);
@@ -1999,7 +2014,7 @@ public class Z80CPU {
                 }
 				break;
 			case OpCodes.ADD_SP_e:
-                SP = AddByteToUShort(SP, ram[PC++]);
+                SP = AddByteToUShort(SP, _ram[PC++]);
                 break;
 			case OpCodes.INC_BC:
                 Increment(ref B, ref C);
@@ -2085,8 +2100,8 @@ public class Z80CPU {
 			case OpCodes.JR_C_e:
                 Do_JumpRelativeConditional((F & CARRY_FLAG) == CARRY_FLAG);
 				break;
-			case OpCodes.JP_mHL:
-                PC = ram[GetHLAddress()];
+			case OpCodes.JP_mHL:  // Actually just loads HL into PC, not memory at HL... :(
+                PC = GetHLAddress();
                 break;
 			case OpCodes.CALL_NN:
                 Do_CallConditional(true);
