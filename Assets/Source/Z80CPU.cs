@@ -23,6 +23,11 @@ public class Z80CPU {
         }
     }
 
+    public Z80CPU()
+    {
+        //_ram[0xFF44] = 0x90;
+    }
+
     // Run the processor upt a maximum of the simulated time indicated in seconds.
     // It doesn't actually take that long (I hope!), but rather uses the clock
     // speed against a cycle counter and runs however many operations it would
@@ -748,23 +753,30 @@ public class Z80CPU {
     // fundamentally the same. I added a MathOperType because one of the flags is
     // literally "did we just subtract", which is pratty arbitrary but needs to be
     // set regardless.
-    void SetFAddition(byte a, byte b, byte result, MathOperType oper, bool zeroCheck = true)
+    void SetFAddition(byte a, byte b, byte result, bool zeroCheck = true)
 	{
-        byte carryCheck = (byte)(a ^ b ^ result);
+        var r = a + b;
+        var hr = (a & 0xf) + (b & 0xf);
 
-		F |= (byte)((byte)(carryCheck & 0x3) == 0x3 ? HALF_CARRY_FLAG : 0);
-		F |= (byte)((byte)(carryCheck & 0x10) == 0x10 ? CARRY_FLAG : 0);
+        SetFlagConditional(HALF_CARRY_FLAG, hr > 0x0f);
+        SetFlagConditional(CARRY_FLAG, r > 0xff);
 
-        switch(oper)
+        F &= (byte)~SUBT_FLAG;
+        if (zeroCheck)
         {
-            case MathOperType.Addition:
-                F &= (byte)~SUBT_FLAG;
-                break;
-            case MathOperType.Subtraction:
-                F |= SUBT_FLAG;
-                break;
+            SetFlagConditional(ZERO_FLAG, result==0);
         }
+    }
 
+    void SetFSubtraction(byte a, byte b, byte result, bool zeroCheck = true)
+    {
+        var r = a - b;
+        var hr = (a & 0x0f) - (b & 0x0f);
+
+        SetFlagConditional(HALF_CARRY_FLAG, hr < 0);
+        SetFlagConditional(CARRY_FLAG, r < 0);
+
+        SetFlag(SUBT_FLAG);
         if (zeroCheck)
         {
             SetFlagConditional(ZERO_FLAG, result==0);
@@ -790,21 +802,21 @@ public class Z80CPU {
     ushort AddByteToUShort(ushort a, byte b)
 	{
         ushort result = (ushort)(a + b);
-        SetFAddition((byte)(a & 0x00ff), b, (byte)(result & 0x00ff), MathOperType.Addition);
+        SetFAddition((byte)(a & 0x00ff), b, (byte)(result & 0x00ff));
 
         return result;
     }
 
     byte AddByteToByte(byte a, byte b) {
         byte result = (byte)(a + b);
-        SetFAddition(a, b, result, MathOperType.Addition);
+        SetFAddition(a, b, result);
         return result;
     }
 
     byte AddByteToAccum(byte b)
 	{
         byte result = (byte)(A + b);
-        SetFAddition(A, b, result, MathOperType.Addition);
+        SetFAddition(A, b, result);
 		return result;
     }
 
@@ -813,23 +825,23 @@ public class Z80CPU {
         byte carry = (byte)((F & CARRY_FLAG) == CARRY_FLAG ? 1 : 0);
         byte t = (byte)(b + carry);
         byte result = (byte)(A + t);
-        SetFAddition(A, t, result, MathOperType.Addition);
+        SetFAddition(A, t, result);
 		return result;
     }
 
     byte SubtractByteFromAccum(byte b)
     {
         byte result = (byte)(A - b);
-        SetFAddition(A, (byte)-b, result, MathOperType.Subtraction);
+        SetFSubtraction(A, b, result);
         return result;
     }
 
     byte SubtractByteAndCarryFromAccum(byte b)
     {
         byte carry = (byte)((F & CARRY_FLAG) == CARRY_FLAG ? 1 : 0);
-        byte n = (byte)-(b + carry);
-        byte result = (byte)(A + n);
-        SetFAddition(A, n, result, MathOperType.Subtraction);
+        byte n = (byte)(b + carry);
+        byte result = (byte)(A - n);
+        SetFSubtraction(A, n, result);
         return result;
     }
 
@@ -838,7 +850,7 @@ public class Z80CPU {
         // The compare state is the same as subtract, but with no
         // value returned to be written. So that's thrown out; but
         // the flag values will still be set. So yay!
-        SubtractByteFromAccum(b);
+        SubtractByteAndCarryFromAccum(b);
     }
 
 	void Increment(ref byte b) {
@@ -859,33 +871,113 @@ public class Z80CPU {
 
     // Rotate left through self; but copy the old leftmost bit to carry anyway
     byte Do_RLC(byte value) {
+        byte result = (byte)((value << 1) | (value >> 7));
+
         // 0x80 is binary 1000 0000, checking the leftmost bit for carry
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x80) == 0x80);
-        return (byte)((value << 1) | (value >> 7));
+        SetFlagConditional(CARRY_FLAG, (value & 0x80) == 0x80);
+        ResetFlag(HALF_CARRY_FLAG);
+        ResetFlag(SUBT_FLAG);
+        SetFlagConditional(ZERO_FLAG, result == 0);
+
+        return result;
     }
 
     // Rotate left THROUGH the CARRY_FLAG bit, such that C moves to bit 0 and bit 7 moves to C
     byte Do_RL(byte value) {
         int carryBit = (F & CARRY_FLAG) == CARRY_FLAG ? 1 : 0;
+
+        byte result = (byte)((value << 1) | carryBit);
+
         // 0x80 is binary 1000 0000, checking the leftmost bit for carry
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x80) == 0x80);
-        return (byte)((value << 1) | carryBit);
+        SetFlagConditional(CARRY_FLAG, (value & 0x80) == 0x80);
+        ResetFlag(HALF_CARRY_FLAG);
+        ResetFlag(SUBT_FLAG);
+        SetFlagConditional(ZERO_FLAG, result == 0);
+
+        return result;
     }
 
     // Rotate right through self; but put bit 1 into carry
     byte Do_RRC(byte value) {
+        byte result = (byte)((value >> 1) | (value << 7));
+
         // Set carry flag if 
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x01) == 0x01);
-        return (byte)((value >> 1) | (value << 7));
+        SetFlagConditional(CARRY_FLAG, (value & 0x01) == 0x01);
+        ResetFlag(HALF_CARRY_FLAG);
+        ResetFlag(SUBT_FLAG);
+        SetFlagConditional(ZERO_FLAG, result == 0);
+
+        return result;
     }
 
     // rotate right THROUGH carry
     byte Do_RR(byte value) {
         // 0x80 is binary 1000 0000 (bit 7), so set bit 7 if carry is set
         int carryBit = (F & CARRY_FLAG) == CARRY_FLAG ? 0x80 : 0;
+
+        byte result = (byte)((value >> 1) | carryBit);
+
         // move bit 1 into the carry flag
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x01) == 0x01);
-        return (byte)((value >> 1) | carryBit);
+        SetFlagConditional(CARRY_FLAG, (value & 0x01) == 0x01);
+        ResetFlag(HALF_CARRY_FLAG);
+        ResetFlag(SUBT_FLAG);
+        SetFlagConditional(ZERO_FLAG, result == 0);
+
+        return result;
+    }
+
+    //=========================================================================
+    // Shift helpers
+
+    // Shift value to the left one bit
+    byte Do_SLA(byte value) {
+        // Set carry to the leftmost bit (7), which is binary 1000 0000, or 0x80
+        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x80) == 0x80);
+        byte result = (byte)(value << 1);
+        SetFlagConditional(ZERO_FLAG, result == 0);
+        ResetFlag(SUBT_FLAG);
+        ResetFlag(HALF_CARRY_FLAG);
+        return result;
+    }
+
+    // Shift value to the right one bit, preserving bit 7
+    byte Do_SRA(byte value) {
+        int msb_flag = value & 0x80;
+        byte result = (byte)((value >> 1) | msb_flag);
+
+        SetFlagConditional(CARRY_FLAG, (value & 0x01) == 0x01);
+        SetFlagConditional(ZERO_FLAG, result == 0);
+        ResetFlag(SUBT_FLAG);
+        ResetFlag(HALF_CARRY_FLAG);
+
+        return result;
+    }
+
+    // Shift value to the right one bit, putting 0 into bit 7
+    byte Do_SRL(byte value) {
+        // 0x7f is binary 0111_1111 -- a mask to force the leftmost bit to 0
+        byte result = (byte)((value >> 1) & 0x7f);
+
+        SetFlagConditional(CARRY_FLAG, (value & 0x01) == 0x01);
+        SetFlagConditional(ZERO_FLAG, result == 0);
+        ResetFlag(SUBT_FLAG);
+        ResetFlag(HALF_CARRY_FLAG);
+
+        return result;
+    }
+
+    byte Do_SWAP(byte value) {
+        int high = value & 0xf0;
+        int low = value & 0x0f;
+        int result = high >> 4 | low << 4;
+
+
+        SetFlagConditional(ZERO_FLAG, result == 0);
+        ResetFlag(SUBT_FLAG);
+        ResetFlag(HALF_CARRY_FLAG);
+        ResetFlag(CARRY_FLAG);
+
+        return (byte)result;
     }
 
     //=========================================================================
@@ -974,56 +1066,6 @@ public class Z80CPU {
             PC = PopAddressHelper();
             _cycles += 3;
         }
-    }
-
-    //=========================================================================
-    // Shift helpers
-
-    // Shift value to the left one bit
-    byte Do_SLA(byte value) {
-        // Set carry to the leftmost bit (7), which is binary 1000 0000, or 0x80
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x80) == 0x80);
-        byte result = (byte)(value << 1);
-        SetFlagConditional(ZERO_FLAG, result == 0);
-        ResetFlag(SUBT_FLAG);
-        ResetFlag(HALF_CARRY_FLAG);
-        return result;
-    }
-
-    // Shift value to the right one bit, putting 0 into bit 7
-    byte Do_SRA(byte value) {
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x01) == 0x01);
-        // 0x7f is binary 0111_1111 -- a mask to force the leftmost bit to 0
-        byte result = (byte)((value >> 1) & 0x7f);
-        SetFlagConditional(ZERO_FLAG, result == 0);
-        ResetFlag(SUBT_FLAG);
-        ResetFlag(HALF_CARRY_FLAG);
-        return result;
-    }
-
-    // Shift value to the right one bit, preserving bit 7
-    byte Do_SRL(byte value) {
-        SetFlagConditional(CARRY_FLAG, (byte)(value & 0x01) == 0x01);
-        int msb_flag = value & 0x80;
-        byte result = (byte)((value >> 1) | msb_flag);
-        SetFlagConditional(ZERO_FLAG, result == 0);
-        ResetFlag(SUBT_FLAG);
-        ResetFlag(HALF_CARRY_FLAG);
-        return result;
-    }
-
-    byte Do_SWAP(byte value) {
-        int high = value & 0xf0;
-        int low = value & 0x0f;
-        int result = high >> 4 | low << 4;
-
-
-        SetFlagConditional(ZERO_FLAG, result == 0);
-        ResetFlag(SUBT_FLAG);
-        ResetFlag(HALF_CARRY_FLAG);
-        ResetFlag(CARRY_FLAG);
-
-        return (byte)result;
     }
 
     //=========================================================================
@@ -1214,22 +1256,22 @@ public class Z80CPU {
                         A = HandleRotateShiftOp(A, code);
                         break;
                     case SecondOpRegisterPattern.B:
-                        B = HandleRotateShiftOp(A, code);
+                        B = HandleRotateShiftOp(B, code);
                         break;
                     case SecondOpRegisterPattern.C:
-                        C = HandleRotateShiftOp(A, code);
+                        C = HandleRotateShiftOp(C, code);
                         break;
                     case SecondOpRegisterPattern.D:
-                        D = HandleRotateShiftOp(A, code);
+                        D = HandleRotateShiftOp(D, code);
                         break;
                     case SecondOpRegisterPattern.E:
-                        E = HandleRotateShiftOp(A, code);
+                        E = HandleRotateShiftOp(E, code);
                         break;
                     case SecondOpRegisterPattern.H:
-                        H = HandleRotateShiftOp(A, code);
+                        H = HandleRotateShiftOp(H, code);
                         break;
                     case SecondOpRegisterPattern.L:
-                        L = HandleRotateShiftOp(A, code);
+                        L = HandleRotateShiftOp(L, code);
                         break;
                     case SecondOpRegisterPattern.mHL:
                         WriteRam(GetHLAddress(), HandleRotateShiftOp(_ram[GetHLAddress()], code));
@@ -1304,6 +1346,9 @@ public class Z80CPU {
 	private static ulong _debugCycleCount = 0;
 	private static bool _hitJump = false;
 
+    // DEBUG OUTPUT INFO
+    private List<OperationInfo> _debugOps = new List<OperationInfo>();
+
     //=========================================================================
     // Process the next instruction on the CPU
     private void Process(bool printOpcodes)
@@ -1325,7 +1370,7 @@ public class Z80CPU {
 
 		if(PC == 0xC0C2) {
 			Console.WriteLine("HIT THE LINE!! " + _debugCycleCount);
-			DumpLastOperations ();
+			//DumpLastOperations ();
 			_hitJump = true;
 		}
 
@@ -1346,10 +1391,43 @@ public class Z80CPU {
                 Console.WriteLine("0x" + (PC - 1).ToString("X4") + "  $" + opcode.ToString("X") + "  " + opcode.ToString());
             }
 
-            _info_q.Enqueue(new OperationInfo() { code = opcode, addr = (ushort)(PC - 1) });
+            OperationInfo info = new OperationInfo() { code = opcode, addr = (ushort)(PC - 1) };
+            _info_q.Enqueue(info);
             while(_info_q.Count > 20)
             {
                 _info_q.Dequeue();
+            }
+
+            if (_debugOps.Count < 50001)
+                _debugOps.Add(info);
+
+            switch(_debugOps.Count)
+            {
+                case 16963:
+                case 40618:
+                    _ram[0xFF44] = 0x90;
+                    break;
+                
+                case 17000:
+                    _ram[0xFF44] = 0x00;
+                    break;
+            }
+            if (_debugOps.Count == 40875) {
+                // _ram[0xFF44] = 0x90;
+                Console.WriteLine("There's the line number..." + opcode);
+            }
+
+            if (_debugOps.Count == 50000)
+            {
+                Console.WriteLine("Writing the lines.");
+                List<string> lines = new List<string>();
+                foreach(var o in _debugOps)
+                {
+                    lines.Add(String.Format("0x{0}  {1}", o.addr.ToString("X4"), o.code.ToString("X")));
+                }
+
+                System.IO.File.WriteAllLines("cs_debug.bytes", lines.ToArray());
+                Console.WriteLine("...Done!");
             }
         }
 
