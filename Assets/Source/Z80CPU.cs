@@ -25,7 +25,15 @@ public class Z80CPU {
 
     public Z80CPU()
     {
-        //_ram[0xFF44] = 0x90;
+        // D = 0x00;
+
+        // A = 0x01;
+        // F = 0x00;
+        // B = 0xFF;
+        // E = 0xC1;
+        // H = 0x84;
+        // C = 0x13;
+        // L = 0x03;
     }
 
     // Run the processor upt a maximum of the simulated time indicated in seconds.
@@ -51,10 +59,10 @@ public class Z80CPU {
 
             ++steps;
             Process(seconds == 0);
-        } while (_cycles * _cycleTime * 4 < seconds && steps < 100000);
+        } while (_cycles * _cycleTime * 4 < seconds && steps < 200000);
 
-        if (steps == 100000) {
-            System.Console.WriteLine("Hit 100,000 steps @ " + _cycles + " cycles");
+        if (steps == 200000) {
+            System.Console.WriteLine("Hit 200,000 steps @ " + _cycles + " cycles");
         }
     }
 
@@ -101,14 +109,14 @@ public class Z80CPU {
 	// These are often accessed in pairs to address memory.
 	// I can't decide if it's better to use them as combined
 	// shorts, individual bytes, or have both and sync them. :\
-    private byte A = 0x00;
-	private byte F = 0x00;
-    private byte B = 0x00;
-	private byte C = 0x00;
-    private byte D = 0x00;
-	private byte E = 0x00;
-    private byte H = 0x00;
-	private byte L = 0x00;
+    private volatile byte A = 0x00;
+	private volatile byte F = 0x00;
+    private volatile byte B = 0x00;
+	private volatile byte C = 0x00;
+    private volatile byte D = 0x00;
+	private volatile byte E = 0x00;
+    private volatile byte H = 0x00;
+	private volatile byte L = 0x00;
 
     // Flag (F) register masks
     private byte ZERO_FLAG = 1 << 7;
@@ -145,6 +153,12 @@ public class Z80CPU {
 
     void WriteRam(ushort addr, byte val) {
         _ram[addr] = val;
+
+        // if (val == 0x88)
+        //     Console.WriteLine("Writing 0x88");
+        
+        // if (addr == 0xff83)
+        //     Console.WriteLine("Writing " + val + " to 0xFF83");
 
         if (addr == SC_addr && val == 0x81) {
             //Console.WriteLine("Wrote to serial! :: " + System.Text.Encoding.ASCII.GetString(new byte[]{val}));
@@ -854,7 +868,7 @@ public class Z80CPU {
     }
 
 	void Increment(ref byte b) {
-		SetFlagConditional(HALF_CARRY_FLAG, (byte)(b & 0x07) == 0x7);
+		SetFlagConditional(HALF_CARRY_FLAG, (byte)(b & 0x0f) == 0x0f);
         ResetFlag(SUBT_FLAG);
         SetFlagConditional(ZERO_FLAG, ++b == 0);
     }
@@ -862,7 +876,7 @@ public class Z80CPU {
 	void Decrement(ref byte b)
 	{
         SetFlag(SUBT_FLAG);
-        SetFlagConditional(HALF_CARRY_FLAG, (byte)(b & 0x0f) != 0x00);
+        SetFlagConditional(HALF_CARRY_FLAG, (byte)(b & 0x0f) == 0x00);
         SetFlagConditional(ZERO_FLAG, --b == 0);
     }
 
@@ -1332,6 +1346,14 @@ public class Z80CPU {
     struct OperationInfo {
         public OpCodes code;
         public ushort addr;
+        public byte a;
+        public byte b;
+        public byte c;
+        public byte d;
+        public byte e;
+        public byte f;
+        public byte h;
+        public byte l;
     }
     private Queue<OperationInfo> _info_q = new Queue<OperationInfo>();
 	private void DumpLastOperations()
@@ -1359,22 +1381,6 @@ public class Z80CPU {
             return;
         }
 
-		++_debugCycleCount;
-
-//		if (_hitJump && PC < 0x4000) {
-//			Console.WriteLine ("Went back @" + _debugCycleCount + " to 0x" + PC.ToString ("X4"));
-//			DumpLastOperations ();
-//			_hitJump = false;
-//		}
-
-
-		if(PC == 0xC0C2) {
-			Console.WriteLine("HIT THE LINE!! " + _debugCycleCount);
-			//DumpLastOperations ();
-			_hitJump = true;
-		}
-
-
         byte instruction = _ram[PC++];
         OpCodes opcode = (OpCodes)instruction;
 
@@ -1391,14 +1397,14 @@ public class Z80CPU {
                 Console.WriteLine("0x" + (PC - 1).ToString("X4") + "  $" + opcode.ToString("X") + "  " + opcode.ToString());
             }
 
-            OperationInfo info = new OperationInfo() { code = opcode, addr = (ushort)(PC - 1) };
+            OperationInfo info = new OperationInfo() { code = opcode, addr = (ushort)(PC - 1), a=A, b=B, c=C, d=D, e=E, f=F, h=H, l=L };
             _info_q.Enqueue(info);
             while(_info_q.Count > 20)
             {
                 _info_q.Dequeue();
             }
 
-            if (_debugOps.Count < 50001)
+            if (_debugOps.Count < 100001)
                 _debugOps.Add(info);
 
             switch(_debugOps.Count)
@@ -1412,17 +1418,20 @@ public class Z80CPU {
                     _ram[0xFF44] = 0x00;
                     break;
             }
-            if (_debugOps.Count == 40875) {
-                // _ram[0xFF44] = 0x90;
-                Console.WriteLine("There's the line number..." + opcode);
-            }
+            // if (_debugOps.Count == 42817) {
+            //     // _ram[0xFF44] = 0x90;
+            //     Console.WriteLine("There's the line number..." + opcode);
+            // }
 
-            if (_debugOps.Count == 50000)
+            if (_debugOps.Count == 100000)
             {
                 Console.WriteLine("Writing the lines.");
                 List<string> lines = new List<string>();
                 foreach(var o in _debugOps)
                 {
+                    lines.Add(String.Format("A:{0} B:{1} C:{2} D:{3} E:{4} F:{5} H:{6} L:{7}",
+                                            o.a.ToString("X2"), o.b.ToString("X2"), o.c.ToString("X2"), o.d.ToString("X2"),
+                                            o.e.ToString("X2"), o.f.ToString("X2"), o.h.ToString("X2"), o.l.ToString("X2")));
                     lines.Add(String.Format("0x{0}  {1}", o.addr.ToString("X4"), o.code.ToString("X")));
                 }
 
@@ -1628,22 +1637,22 @@ public class Z80CPU {
                 WriteRam(GetHLAddress(), A);
 				break;
 			case OpCodes.LD_mHL_B:
-                WriteRam(GetHLAddress(), A);
+                WriteRam(GetHLAddress(), B);
 				break;
 			case OpCodes.LD_mHL_C:
-                WriteRam(GetHLAddress(), A);
+                WriteRam(GetHLAddress(), C);
 				break;
 			case OpCodes.LD_mHL_D:
-                WriteRam(GetHLAddress(), A);
+                WriteRam(GetHLAddress(), D);
 				break;
 			case OpCodes.LD_mHL_E:
-                WriteRam(GetHLAddress(), A);
+                WriteRam(GetHLAddress(), E);
 				break;
 			case OpCodes.LD_mHL_H:
-                WriteRam(GetHLAddress(), A);
+                WriteRam(GetHLAddress(), H);
 				break;
 			case OpCodes.LD_mHL_L:
-                WriteRam(GetHLAddress(), A);
+                WriteRam(GetHLAddress(), L);
 				break;
 			case OpCodes.LD_mHL_N:
                 WriteRam(GetHLAddress(), _ram[PC++]);
@@ -1658,7 +1667,7 @@ public class Z80CPU {
                 A = _ram[GetFFCAddress()];
 				break;
 			case OpCodes.LD_mC_A:
-                WriteRam(GetDEAddress(), A);
+                WriteRam(GetFFCAddress(), A);
 				break;
 			case OpCodes.LD_A_mN:
                 A = _ram[GetFFNAddress(_ram[PC++])];
@@ -1929,39 +1938,39 @@ public class Z80CPU {
                 SetFLogic(A, false);
 				break;
 			case OpCodes.XOR_A:
-                A = (byte)(A ^ A);
+                A ^= A;
                 SetFLogic(A, false);
 				break;
 			case OpCodes.XOR_B:
-                A = (byte)(A ^ B);
+                A ^= B;
                 SetFLogic(A, false);
 				break;
 			case OpCodes.XOR_C:
-                A = (byte)(A ^ C);
+                A ^= C;
                 SetFLogic(A, false);
 				break;
 			case OpCodes.XOR_D:
-                A = (byte)(A ^ D);
+                A ^= D;
                 SetFLogic(A, false);
 				break;
 			case OpCodes.XOR_E:
-                A = (byte)(A ^ E);
+                A ^= E;
                 SetFLogic(A, false);
 				break;
 			case OpCodes.XOR_H:
-                A = (byte)(A ^ H);
+                A ^= H;
                 SetFLogic(A, false);
 				break;
 			case OpCodes.XOR_L:
-                A = (byte)(A ^ L);
+                A ^= L;
                 SetFLogic(A, false);
 				break;
 			case OpCodes.XOR_N:
-                A = (byte)(A ^ _ram[PC++]);
+                A ^= _ram[PC++];
                 SetFLogic(A, false);
 				break;
 			case OpCodes.XOR_mHL:
-                A = (byte)(A ^ _ram[GetHLAddress()]);
+                A ^= _ram[GetHLAddress()];
                 SetFLogic(A, false);
 				break;
 			case OpCodes.CP_A:
