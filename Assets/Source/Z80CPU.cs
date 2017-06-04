@@ -161,7 +161,7 @@ public class Z80CPU {
         //     Console.WriteLine("Writing " + val + " to 0xFF83");
 
         if (addr == SC_addr && val == 0x81) {
-            //Console.WriteLine("Wrote to serial! :: " + System.Text.Encoding.ASCII.GetString(new byte[]{val}));
+            //Console.WriteLine("Wrote to serial! :: " + System.Text.Encoding.ASCII.GetString(new byte[]{_ram[SB_addr]}));
             _serialOut.Add(_ram[SB_addr]);
             _ram[SC_addr] &= 0x0f;
         }
@@ -763,10 +763,6 @@ public class Z80CPU {
         Subtraction
     }
 
-    // Subtraction is just addition of a negative number; so most of the checks are
-    // fundamentally the same. I added a MathOperType because one of the flags is
-    // literally "did we just subtract", which is pratty arbitrary but needs to be
-    // set regardless.
     void SetFAddition(byte a, byte b, byte result, bool zeroCheck = true)
 	{
         var r = a + b;
@@ -823,7 +819,7 @@ public class Z80CPU {
 
     byte AddByteToByte(byte a, byte b) {
         byte result = (byte)(a + b);
-        SetFAddition(a, b, result);
+        SetFAddition(a, b, result, false);
         return result;
     }
 
@@ -1411,10 +1407,14 @@ public class Z80CPU {
             {
                 case 16963:
                 case 40618:
+                case 55077:
+                case 63584:
                     _ram[0xFF44] = 0x90;
                     break;
                 
                 case 17000:
+                case 51199:
+                case 56360:
                     _ram[0xFF44] = 0x00;
                     break;
             }
