@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
+// ReSharper disable InconsistentNaming
 
 public class Z80CPU {
 
@@ -34,6 +35,7 @@ public class Z80CPU {
         // H = 0x84;
         // C = 0x13;
         // L = 0x03;
+        InitializeOpcodes();
     }
 
     // Run the processor upt a maximum of the simulated time indicated in seconds.
@@ -109,14 +111,14 @@ public class Z80CPU {
 	// These are often accessed in pairs to address memory.
 	// I can't decide if it's better to use them as combined
 	// shorts, individual bytes, or have both and sync them. :\
-    private volatile byte A = 0x00;
-	private volatile byte F = 0x00;
-    private volatile byte B = 0x00;
-	private volatile byte C = 0x00;
-    private volatile byte D = 0x00;
-	private volatile byte E = 0x00;
-    private volatile byte H = 0x00;
-	private volatile byte L = 0x00;
+    private byte A = 0x00;
+	private byte F = 0x00;
+    private byte B = 0x00;
+	private byte C = 0x00;
+    private byte D = 0x00;
+	private byte E = 0x00;
+    private byte H = 0x00;
+	private byte L = 0x00;
 
     // Flag (F) register masks
     private byte ZERO_FLAG = 1 << 7;
@@ -428,258 +430,260 @@ public class Z80CPU {
         RES_b_r = 0xCB,
     }
 
-    private struct OpMetaData
+    private class OpMetaData
     {
         public uint cycleCount;
         public byte counterShift;
     }
 
-    private Dictionary<OpCodes, OpMetaData> OpInfo = new Dictionary<OpCodes, OpMetaData>()
+    private OpMetaData[] OpInfo = new OpMetaData[256];
+    //private Dictionary<OpCodes, OpMetaData> OpInfo = new Dictionary<OpCodes, OpMetaData>()
+    private void InitializeOpcodes()
     {
-        { OpCodes.LD_A_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_A_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_A_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_A_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_A_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_A_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_A_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_B_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_B_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_B_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_B_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_B_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_B_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_B_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_C_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_C_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_C_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_C_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_C_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_C_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_C_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_D_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_D_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_D_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_D_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_D_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_D_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_D_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_E_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_E_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_E_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_E_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_E_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_E_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_E_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_H_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_H_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_H_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_H_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_H_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_H_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_H_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_L_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_L_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_L_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_L_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_L_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_L_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_L_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.LD_A_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.LD_B_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.LD_C_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.LD_D_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.LD_E_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.LD_H_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.LD_L_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.LD_A_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_B_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_C_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_D_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_E_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_H_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_L_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_mHL_A, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_mHL_B, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_mHL_C, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_mHL_D, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_mHL_E, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_mHL_H, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_mHL_L, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_mHL_N, new OpMetaData() { cycleCount = 3, counterShift = 2 } },
-        { OpCodes.LD_A_mBC, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_A_mDE, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_A_mC, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_mC_A, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_A_mN, new OpMetaData() { cycleCount = 3, counterShift = 2 } },
-        { OpCodes.LD_mN_A, new OpMetaData() { cycleCount = 3, counterShift = 2 } },
-        { OpCodes.LD_A_mNN, new OpMetaData() { cycleCount = 4, counterShift = 3 } },
-        { OpCodes.LD_mNN_A, new OpMetaData() { cycleCount = 4, counterShift = 3 } },
-        { OpCodes.LD_A_HLI, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_A_HLD, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_mBC_A, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_mDE_A, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_HLI_A, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_HLD_A, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.LD_BC_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
-        { OpCodes.LD_DE_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
-        { OpCodes.LD_HL_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
-        { OpCodes.LD_SP_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
-        { OpCodes.LD_SP_HL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.PUSH_BC, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.PUSH_DE, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.PUSH_HL, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.PUSH_AF, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.POP_BC, new OpMetaData() { cycleCount = 3, counterShift = 1 } },
-        { OpCodes.POP_DE, new OpMetaData() { cycleCount = 3, counterShift = 1 } },
-        { OpCodes.POP_HL, new OpMetaData() { cycleCount = 3, counterShift = 1 } },
-        { OpCodes.POP_AF, new OpMetaData() { cycleCount = 3, counterShift = 1 } },
-        { OpCodes.LDHL_SP_e, new OpMetaData() { cycleCount = 3, counterShift = 2 } },
-        { OpCodes.LD_mNN_SP, new OpMetaData() { cycleCount = 5, counterShift = 3 } },
-        { OpCodes.ADD_A_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADD_A_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADD_A_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADD_A_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADD_A_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADD_A_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADD_A_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADD_A_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.ADD_A_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.ADC_A_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADC_A_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADC_A_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADC_A_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADC_A_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADC_A_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADC_A_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.ADC_A_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.ADC_A_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.SUB_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SUB_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SUB_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SUB_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SUB_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SUB_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SUB_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SUB_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.SUB_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.SBC_A_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SBC_A_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SBC_A_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SBC_A_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SBC_A_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SBC_A_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SBC_A_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.SBC_A_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.SBC_A_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.AND_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.AND_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.AND_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.AND_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.AND_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.AND_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.AND_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.AND_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.AND_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.OR_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.OR_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.OR_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.OR_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.OR_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.OR_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.OR_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.OR_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.OR_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.XOR_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.XOR_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.XOR_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.XOR_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.XOR_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.XOR_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.XOR_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.XOR_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.XOR_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.CP_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.CP_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.CP_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.CP_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.CP_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.CP_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.CP_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.CP_N, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.CP_mHL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.INC_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.INC_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.INC_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.INC_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.INC_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.INC_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.INC_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.INC_mHL, new OpMetaData() { cycleCount = 3, counterShift = 1 } },
-        { OpCodes.DEC_A, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.DEC_B, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.DEC_C, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.DEC_D, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.DEC_E, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.DEC_H, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.DEC_L, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.DEC_mHL, new OpMetaData() { cycleCount = 3, counterShift = 1 } },
-        { OpCodes.ADD_HL_BC, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.ADD_HL_DE, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.ADD_HL_HL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.ADD_HL_SP, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.ADD_SP_e, new OpMetaData() { cycleCount = 4, counterShift = 2 } },
-        { OpCodes.INC_BC, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.INC_DE, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.INC_HL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.INC_SP, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.DEC_BC, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.DEC_DE, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.DEC_HL, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.DEC_SP, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.RLCA, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.RLA, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.RRCA, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.RRA, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.MULTI_BYTE_OP, new OpMetaData() { cycleCount = 0, counterShift = 0 } }, // These are handled elsewhere
-        { OpCodes.JP_NN, new OpMetaData() { cycleCount = 4, counterShift = 0 } },
-        { OpCodes.JP_NZ_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
-        { OpCodes.JP_Z_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
-        { OpCodes.JP_NC_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
-        { OpCodes.JP_C_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
-        { OpCodes.JR_e, new OpMetaData() { cycleCount = 3, counterShift = 2 } },
-        { OpCodes.JR_NZ_e, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.JR_Z_e, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.JR_NC_e, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.JR_C_e, new OpMetaData() { cycleCount = 2, counterShift = 2 } },
-        { OpCodes.JP_mHL, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.CALL_NN, new OpMetaData() { cycleCount = 6, counterShift = 3 } },
-        { OpCodes.CALL_NZ_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
-        { OpCodes.CALL_Z_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
-        { OpCodes.CALL_NC_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
-        { OpCodes.CALL_C_NN, new OpMetaData() { cycleCount = 3, counterShift = 3 } },
-        { OpCodes.RET, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.RETI, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.RET_NZ, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.RET_Z, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.RET_NC, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.RET_C, new OpMetaData() { cycleCount = 2, counterShift = 1 } },
-        { OpCodes.RST_0, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.RST_1, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.RST_2, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.RST_3, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.RST_4, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.RST_5, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.RST_6, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.RST_7, new OpMetaData() { cycleCount = 4, counterShift = 1 } },
-        { OpCodes.DAA, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.CPL, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.NOP, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.HALT, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.STOP, new OpMetaData() { cycleCount = 1, counterShift = 2 } },
-        { OpCodes.EI, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-        { OpCodes.DI, new OpMetaData() { cycleCount = 1, counterShift = 1 } },
-    };
+        OpInfo[(int)OpCodes.LD_A_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_A_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_A_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_A_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_A_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_A_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_A_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_B_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_B_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_B_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_B_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_B_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_B_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_B_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_C_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_C_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_C_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_C_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_C_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_C_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_C_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_D_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_D_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_D_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_D_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_D_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_D_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_D_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_E_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_E_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_E_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_E_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_E_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_E_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_E_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_H_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_H_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_H_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_H_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_H_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_H_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_H_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_L_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_L_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_L_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_L_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_L_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_L_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_L_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_A_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.LD_B_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.LD_C_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.LD_D_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.LD_E_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.LD_H_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.LD_L_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.LD_A_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_B_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_C_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_D_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_E_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_H_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_L_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_mHL_A] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_mHL_B] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_mHL_C] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_mHL_D] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_mHL_E] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_mHL_H] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_mHL_L] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_mHL_N] = new OpMetaData() { cycleCount = 3, counterShift = 2 };
+        OpInfo[(int)OpCodes.LD_A_mBC] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_A_mDE] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_A_mC] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_mC_A] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_A_mN] = new OpMetaData() { cycleCount = 3, counterShift = 2 };
+        OpInfo[(int)OpCodes.LD_mN_A] = new OpMetaData() { cycleCount = 3, counterShift = 2 };
+        OpInfo[(int)OpCodes.LD_A_mNN] = new OpMetaData() { cycleCount = 4, counterShift = 3 };
+        OpInfo[(int)OpCodes.LD_mNN_A] = new OpMetaData() { cycleCount = 4, counterShift = 3 };
+        OpInfo[(int)OpCodes.LD_A_HLI] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_A_HLD] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_mBC_A] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_mDE_A] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_HLI_A] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_HLD_A] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.LD_BC_NN] = new OpMetaData() { cycleCount = 3, counterShift = 3 };
+        OpInfo[(int)OpCodes.LD_DE_NN] = new OpMetaData() { cycleCount = 3, counterShift = 3 };
+        OpInfo[(int)OpCodes.LD_HL_NN] = new OpMetaData() { cycleCount = 3, counterShift = 3 };
+        OpInfo[(int)OpCodes.LD_SP_NN] = new OpMetaData() { cycleCount = 3, counterShift = 3 };
+        OpInfo[(int)OpCodes.LD_SP_HL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.PUSH_BC] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.PUSH_DE] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.PUSH_HL] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.PUSH_AF] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.POP_BC] = new OpMetaData() { cycleCount = 3, counterShift = 1 };
+        OpInfo[(int)OpCodes.POP_DE] = new OpMetaData() { cycleCount = 3, counterShift = 1 };
+        OpInfo[(int)OpCodes.POP_HL] = new OpMetaData() { cycleCount = 3, counterShift = 1 };
+        OpInfo[(int)OpCodes.POP_AF] = new OpMetaData() { cycleCount = 3, counterShift = 1 };
+        OpInfo[(int)OpCodes.LDHL_SP_e] = new OpMetaData() { cycleCount = 3, counterShift = 2 };
+        OpInfo[(int)OpCodes.LD_mNN_SP] = new OpMetaData() { cycleCount = 5, counterShift = 3 };
+        OpInfo[(int)OpCodes.ADD_A_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADD_A_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADD_A_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADD_A_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADD_A_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADD_A_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADD_A_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADD_A_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.ADD_A_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADC_A_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADC_A_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADC_A_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADC_A_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADC_A_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADC_A_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADC_A_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADC_A_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.ADC_A_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.SUB_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SUB_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SUB_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SUB_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SUB_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SUB_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SUB_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SUB_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.SUB_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.SBC_A_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SBC_A_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SBC_A_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SBC_A_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SBC_A_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SBC_A_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SBC_A_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.SBC_A_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.SBC_A_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.AND_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.AND_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.AND_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.AND_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.AND_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.AND_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.AND_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.AND_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.AND_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.OR_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.OR_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.OR_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.OR_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.OR_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.OR_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.OR_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.OR_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.OR_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.XOR_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.XOR_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.XOR_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.XOR_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.XOR_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.XOR_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.XOR_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.XOR_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.XOR_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.CP_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.CP_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.CP_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.CP_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.CP_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.CP_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.CP_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.CP_N] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.CP_mHL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.INC_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.INC_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.INC_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.INC_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.INC_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.INC_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.INC_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.INC_mHL] = new OpMetaData() { cycleCount = 3, counterShift = 1 };
+        OpInfo[(int)OpCodes.DEC_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.DEC_B] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.DEC_C] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.DEC_D] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.DEC_E] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.DEC_H] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.DEC_L] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.DEC_mHL] = new OpMetaData() { cycleCount = 3, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADD_HL_BC] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADD_HL_DE] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADD_HL_HL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADD_HL_SP] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.ADD_SP_e] = new OpMetaData() { cycleCount = 4, counterShift = 2 };
+        OpInfo[(int)OpCodes.INC_BC] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.INC_DE] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.INC_HL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.INC_SP] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.DEC_BC] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.DEC_DE] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.DEC_HL] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.DEC_SP] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.RLCA] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.RLA] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.RRCA] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.RRA] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.MULTI_BYTE_OP] = new OpMetaData() { cycleCount = 0, counterShift = 0 }; // These are handled elsewhere
+        OpInfo[(int)OpCodes.JP_NN] = new OpMetaData() { cycleCount = 4, counterShift = 0 };
+        OpInfo[(int)OpCodes.JP_NZ_NN] = new OpMetaData() { cycleCount = 3, counterShift = 3 };
+        OpInfo[(int)OpCodes.JP_Z_NN] = new OpMetaData() { cycleCount = 3, counterShift = 3 };
+        OpInfo[(int)OpCodes.JP_NC_NN] = new OpMetaData() { cycleCount = 3, counterShift = 3 };
+        OpInfo[(int)OpCodes.JP_C_NN] = new OpMetaData() { cycleCount = 3, counterShift = 3 };
+        OpInfo[(int)OpCodes.JR_e] = new OpMetaData() { cycleCount = 3, counterShift = 2 };
+        OpInfo[(int)OpCodes.JR_NZ_e] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.JR_Z_e] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.JR_NC_e] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.JR_C_e] = new OpMetaData() { cycleCount = 2, counterShift = 2 };
+        OpInfo[(int)OpCodes.JP_mHL] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.CALL_NN] = new OpMetaData() { cycleCount = 6, counterShift = 3 };
+        OpInfo[(int)OpCodes.CALL_NZ_NN] = new OpMetaData() { cycleCount = 3, counterShift = 3 };
+        OpInfo[(int)OpCodes.CALL_Z_NN] = new OpMetaData() { cycleCount = 3, counterShift = 3 };
+        OpInfo[(int)OpCodes.CALL_NC_NN] = new OpMetaData() { cycleCount = 3, counterShift = 3 };
+        OpInfo[(int)OpCodes.CALL_C_NN] = new OpMetaData() { cycleCount = 3, counterShift = 3 };
+        OpInfo[(int)OpCodes.RET] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.RETI] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.RET_NZ] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.RET_Z] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.RET_NC] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.RET_C] = new OpMetaData() { cycleCount = 2, counterShift = 1 };
+        OpInfo[(int)OpCodes.RST_0] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.RST_1] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.RST_2] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.RST_3] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.RST_4] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.RST_5] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.RST_6] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.RST_7] = new OpMetaData() { cycleCount = 4, counterShift = 1 };
+        OpInfo[(int)OpCodes.DAA] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.CPL] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.NOP] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.HALT] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.STOP] = new OpMetaData() { cycleCount = 1, counterShift = 2 };
+        OpInfo[(int)OpCodes.EI] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+        OpInfo[(int)OpCodes.DI] = new OpMetaData() { cycleCount = 1, counterShift = 1 };
+    }
 
     //=========================================================================
     // Accessors to combine the paired registers into a 16-bit value for
@@ -1380,7 +1384,7 @@ public class Z80CPU {
         byte instruction = _ram[PC++];
         OpCodes opcode = (OpCodes)instruction;
 
-        if (!OpInfo.ContainsKey(opcode))
+        if (OpInfo[(int)opcode] == null)
         {
 			DumpLastOperations ();
             Console.WriteLine("Unrecognized opcode: " + opcode.ToString("X") + " at address " + (PC-1).ToString("X4") + "; cycles: " + _cycles);
@@ -1441,7 +1445,7 @@ public class Z80CPU {
         }
 
 
-        OpMetaData meta = OpInfo[opcode];
+        OpMetaData meta = OpInfo[(int)opcode];
 		
  		switch(opcode) {
 			case OpCodes.LD_A_A:
@@ -1744,7 +1748,7 @@ public class Z80CPU {
 				break;
             case OpCodes.LDHL_SP_e:
                 {
-                    byte b = (byte)_ram[PC++];
+                    byte b = _ram[PC++];
                     ushort temp = AddByteToUShort(SP, b);
                     H = (byte)((temp & 0xFF00) >> 8);
                     L = (byte)(temp & 0x00FF);
