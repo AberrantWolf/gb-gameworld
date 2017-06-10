@@ -97,12 +97,25 @@ public class Z80CPU {
         chunk.CopyTo(_ram, start);
     }
 
+    public void LoadROMBytes(byte[] rom_data)
+    {
+        _rom = new byte[rom_data.Length];
+        Array.Copy(rom_data, _rom, rom_data.Length);
+
+        int valid_size = Math.Min(_rom.Length, 0x8000);
+        Array.Copy(_rom, _ram, valid_size);
+
+        GBHeader header = new GBHeader(_rom);
+        header.PrintStats();
+    }
+
     //=========================================================================
     // Private variables required for the CPU to function
     private double _cpuSpeed = 4194304.0;
     private double _cycleTime = 1.0 / (4194304.0);
 
 	private byte[] _ram = new byte[65536];
+    private byte[] _rom;
     private ushort SP = 0xfffe;  // stack pointer
     private ushort PC = 0x0100;  // program counter (the next instruction to execute)
 
@@ -155,6 +168,18 @@ public class Z80CPU {
 
     void WriteRam(ushort addr, byte val) {
         _ram[addr] = val;
+
+        // Handle mirror up
+        if (0xC000 <= addr && addr < 0xDE00)
+        {
+            _ram[addr + 0x2000] = val;
+        }
+
+        // Handle mirror down
+        if (0xE000 <= addr && addr < 0xFE00)
+        {
+            _ram[addr - 0x2000] = val;
+        }
 
         // if (val == 0x88)
         //     Console.WriteLine("Writing 0x88");
@@ -437,7 +462,6 @@ public class Z80CPU {
     }
 
     private OpMetaData[] OpInfo = new OpMetaData[256];
-    //private Dictionary<OpCodes, OpMetaData> OpInfo = new Dictionary<OpCodes, OpMetaData>()
     private void InitializeOpcodes()
     {
         OpInfo[(int)OpCodes.LD_A_A] = new OpMetaData() { cycleCount = 1, counterShift = 1 };

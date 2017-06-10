@@ -30,7 +30,7 @@ public class Z80ControllerBehaviour : MonoBehaviour {
             Debug.Log("REFUSED TO LOAD RESOURCE! D8");
             return;
         }
-        cpu.SetMemory(0, rom);
+        cpu.LoadROMBytes(rom);
     }
 
     float _serialPrintCounter = 0;
